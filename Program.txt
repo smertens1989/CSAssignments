@@ -1,0 +1,65 @@
+/*Program.cs file*/
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
+using System.Diagnostics;
+using System.IO;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace ShippingDispatcher
+{
+    static class Program
+    {
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.ThreadException += new System.Threading.ThreadExceptionEventHandler(Application_ThreadException);
+            Application.Run(new ShippingDispatcher());
+        }
+
+        //THREAD EXCEPTION METHOD TO SEE IF USER WANTS TO STOP CURRENT PROCESS AND START A NEW ONE
+        static void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
+        {
+            //SETTING PATH TO CURRENT DIRECTORY WITH TEXT FILE NAME
+            string path = Directory.GetCurrentDirectory() + @"\ExceptionData.txt";
+
+            //CREATING NEW STREAM WRITER OBJECT NAMED SW
+            using (StreamWriter sw = File.AppendText(path))
+            {
+                //WRITING EXCEPTION'S DATA TO TEXT FILE
+                sw.WriteLine(e.Exception.Data.ToString());
+
+                //WRITING THE DATE AND TIME TO TEXT FILE
+                sw.WriteLine(DateTime.Now);
+            }
+            
+            DialogResult dr = MessageBox.Show("Error Occured In Driver Text Box." + "\n" + "Do You Want to Start Over?", "Error Message Box", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (dr.Equals( DialogResult.Yes))
+            {
+                //SETS MYPROCESS TO CURRENT PROCESS
+                Process myProcess = Process.GetCurrentProcess();
+
+                //CREATE PROCESS OBJECT FOR NEW PROCESS
+                Process newProcess = new Process();
+
+                //GETS FILE NAME FOR NEW PROCESS FROM CURRENT PROCESS
+                newProcess.StartInfo.FileName = myProcess.MainModule.FileName;
+
+                //START NEW PROCESS
+                newProcess.Start();
+                
+                //KILLS CURRENT PROCESS
+                myProcess.Kill();
+            }                           
+        }
+    }
+}

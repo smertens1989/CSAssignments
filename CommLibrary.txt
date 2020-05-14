@@ -1,0 +1,235 @@
+/*CommLibrary.cs File*/
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Reflection;
+using System.IO;
+using System.Threading;
+
+namespace CommLibrary
+{
+    public class OrderEventArgs : EventArgs
+    {
+        //DEFAULT CONSTRUCTOR FOR ORDER EVENT ARGS CLASS
+        public OrderEventArgs() : base() { }
+
+        //PROPERTIES TO HOLD INDEX NUMBER, ADDRESS, CITY, STATE, AND DRIVER
+        private int indexNum;
+        public int IndexNum
+        { 
+            get 
+            { 
+                return indexNum;
+            }
+            set 
+            { 
+                indexNum = value; 
+            } 
+        }
+
+        private string address;
+        public string Address
+        { 
+            get 
+            { 
+                return address;
+            }
+            set 
+            { 
+                address = value;
+            } 
+        }
+
+        private string city;
+        public string City
+        { 
+            get 
+            { 
+                return city;
+            }
+            set 
+            { 
+                city = value; 
+            } 
+        }
+
+        private string state;
+        public string State
+        { 
+            get 
+            { 
+                return state;
+            }
+            set 
+            { 
+                state = value; 
+            } 
+        }
+
+        private string driver;
+        public string Driver
+        {
+            get
+            {
+                return driver;
+            }
+            set
+            {
+                driver = value;
+            }
+        }
+    }
+
+    public class Communicator
+    {
+        //CREATE A TIMER CALL BACK NAMED TCB
+        TimerCallback tcb;
+
+        //CREATE A TIMER CALLED MYTIMER
+        Timer myTimer;
+
+        //CREATE A LIST OF ORDER EVENT ARGS NAMED ORDERLIST
+        List<OrderEventArgs> orderList;
+
+        //DELEGATE FOR ORDER EVENT HANDLER
+        public delegate void OrderEventHandler(object sender, OrderEventArgs oea);
+
+        //EVENT FOR ORDER EVENT HANDLER NAMED ORDER EVENT
+        public event OrderEventHandler OrderEvent;   
+
+        //METHOD THAT WILL FIRE THE EVENT
+        protected void OnOrderEvent(object src)
+        {
+            //NEW UP A RANDOM OBJECT NAMED RANDOM ORDER
+            Random randomOrder = new Random();
+
+            //SET INT X EQUAL TO NUMBER OF ITEMS IN THE ORDER LIST
+            int x = orderList.Count;
+
+            //DECREMENT X BY 1
+            x--;
+
+            //SET RANDOM ORDER TO BE A VALUE BETWEEN 0 AND ORDERLIST.COUNT -1
+            int y = randomOrder.Next(x);
+
+            //CREATE ORDER EVENT ARG NAMED OEA AND SET IT TO A RANDOM ORDER
+            OrderEventArgs oea = orderList[y];
+
+            //IF ORDER EVENT IS NOT NULL THEN FIRE THE EVENT
+            if (OrderEvent != null)
+                OrderEvent(this, oea);
+        }
+
+        //COMMUNICATOR DEFAULT CONSTRUCTOR
+        public Communicator() : base()
+        {
+            //SET TCB TO ON ORDER EVENT
+            tcb = new TimerCallback(OnOrderEvent);
+
+            //SET MYTIMER TO TCB AND HAVE IT FIRE AFTER 10 SECONDS AND AT 10 SECOND INTERVALS
+            myTimer = new Timer(tcb, null, 10000, 10000);
+        }
+
+        //FILL ORDERS METHOD TO PARSE OUT TEXT FILE AND PUT INTO ORDER LIST
+        public void fillOrders()
+        {
+            //STRING NAMED ORDER PATH SET TO THE CURRENT DIRECTORY WITH ORDERS.TXT
+            string orderPath = Directory.GetCurrentDirectory() + @"\Orders.txt";
+
+            //CREATE A STRING ARRAY TO HOLD THE 5 ELEMENTS OF AN ORDER
+            string[] sArray = new string[5];
+
+            //CREATE A LIST TO HOLD THE ORDER EVENT ARGS
+            orderList = new List<OrderEventArgs>();
+
+            //OPEN UP STREM READER TO READ ORDER TEXT FILE
+            using (StreamReader sr = new StreamReader(orderPath))
+            {
+                while(!sr.EndOfStream)
+                {
+                    //READ ONE LINE OF ORDERS FILE AND SPLIT BASED ON AN *
+                    sArray = sr.ReadLine().Split('*');
+
+                    //ADD STRING ARRAY TO THE ORDER LIST
+                    orderList.Add(new OrderEventArgs{IndexNum = int.Parse(sArray[0]), 
+                                                     Address = sArray[1], 
+                                                     City = sArray[2],
+                                                     State = sArray[3], 
+                                                     Driver = sArray[4]});                   
+                }
+            }
+        }
+        
+        //RECEIVEMESSAGE METHOD TO RETURN STRING TO SHIPPING DISPATCHER
+        //WHEN CALL DRIVER BUTTON IS CLICKED
+        public string ReceiveMessage( object sender, string Message ) 
+        {
+            //STARTING NEW ASSEMBLY NAMED ASM
+            Assembly asm = Assembly.GetExecutingAssembly();
+
+            //START OF EXCEPTION TESTING
+
+            //IF MESSAGE STARTS WITH A
+            if(Message.StartsWith("A") || Message.StartsWith("a"))
+                throw new CommunicationException("Error Occured In Driver Text Box");
+
+            //IF MESSAGE STARTS WITH B
+            if (Message.StartsWith("B") || Message.StartsWith("b"))
+            {
+                //PERFORM DIVISION BY 0
+                int a = 0; int b = 1;
+                int c = b / a;
+            }
+
+            //IF MESSAGE STARTS WITH C
+            if (Message.StartsWith("C") || Message.StartsWith("c"))
+            {
+                try
+                {
+                    //PERFORM DIVISION BY 0
+                    int a = 0; int b = 1;
+                    int c = b / a;                
+                }
+
+                catch (DivideByZeroException dbz)
+                {
+                    //THROWING COMMUNICATION EXCEPTION WITH THREE ARGUMENTS
+                    throw new CommunicationException(dbz.Source.ToString(), "Error Occured In Driver Text Box", dbz);
+                }
+            }
+            //END EXCEPTION TESTING
+
+            //GETTING VERSION AND FULL NAME
+            string version = asm.GetName().Version.ToString();
+            string name = asm.FullName;
+
+            //RETURNS MESSAGE TO SHIPPING DISPATCHER
+            return Message + " was received from " + 
+                   sender + "\nFullname: " + name + "\n" + "Version: " + version;
+        }
+    }
+
+    public class CommunicationException : ApplicationException
+    {
+        //ADDING READ WRITE PROPERTY TO THE STRING ADDRESSEE
+        public string Addressee
+        { get; set; }
+
+        //COMMUNICATION EXCEPTION DEFAULT CONSTRUCTOR
+        public CommunicationException() : base() { }
+
+        //2ND CONSTRUCTOR TAKES ON STRING
+        public CommunicationException(string msg) : base(msg) { }
+
+        //3RD CONSTRUCTOR TAKES A STRING AND AN INNER EXCEPTION
+        public CommunicationException(string msg, Exception inner) : base(msg, inner) { }
+
+        //4TH CONSTRUCTOR TAKES TWO STRINGS AND AN INNER EXCEPTION
+        public CommunicationException(string s, string msg, Exception inner):base(msg, inner)
+        {
+            Addressee = s;
+        }
+    }
+}

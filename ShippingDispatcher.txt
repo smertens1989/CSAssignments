@@ -1,0 +1,219 @@
+/*This is the ShippingDispatcher.cs File that is the code behind the ShippingDispatcher.cs[Design] aka the Form*/
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using CommLibrary;
+using System.Data.SqlClient;
+
+namespace ShippingDispatcher
+{
+    public partial class ShippingDispatcher : Form
+    {
+        //DECLARE ADO COMPONENTS AS CLASS INSTANCE VARIABLES
+        SqlConnection conn;
+        SqlCommand cmd;
+        SqlDataAdapter adap;
+        DataSet dset;
+        string connstr, sqlstr;
+
+        //DECLARE COMMUNICATOR OBJECT WITH CLASS WIDE SCOPE
+        CommLibrary.Communicator comm;
+
+        //DECLARE A CLASS WIDE EDITFORM OBJECT
+        EditForm EF;
+
+        public ShippingDispatcher()
+        {
+            //DEFAULT CONSTRUCTOR
+            InitializeComponent();
+
+            //CALLS METHOD TO GET AND FILL IN SHIPPING CODES
+            PopulateShipCombo();
+
+            //CALLS TIME PROCESSOR METHOD
+            timeProcessor();
+
+            //SET STATE COMBO INDEX TO 0
+            StateCombo.SelectedIndex = 0;
+
+            CheckForIllegalCrossThreadCalls = false;
+
+            //NEW UP THE COMM OBJECT
+            comm = new Communicator();
+
+            //CALL FILL ORDERS METHOD AFTER COMMUNICATOR TYPE IS CREATED
+            comm.fillOrders();
+        }
+
+/******************************************************************************************************************/
+
+        //METHOD TO POPULATE THE SHIP COMBO BOX WITH SHIPPING DESCRIPTION AND CODE
+        private void PopulateShipCombo()
+        {
+            //NEW UP A SHIP CODE CONTAINER NAMED CONTAINER
+            var container = new ShipCodeDispenser.ShipCodeContainer();
+
+            //CREATE A LIST OF STRINGS TO HOLD CODES
+            var codes = new List<string>();
+
+            //FOR LOOP TO ADD CODES TO LIST AND FORMAT THEM
+            for(int i = 0; i < container.NumberOfCodes; i++)
+                codes.Add(string.Format("{0} * {1}", container[i].Description, container[i].Code));
+
+            //FOREACH LOOP TO PUT CODES FROM LIST INTO SHIP COMBO BOX
+            foreach(var code in codes)
+                ShipCombo.Items.Add(code);
+
+            //SETS 1ST CODE IN BOX AS INDEX 0
+            ShipCombo.SelectedIndex = 0;
+        }
+
+/******************************************************************************************************************/
+
+        //CREATES A DIGITAL CLOCK ON THE FORM THAT UPDATES EVERY SECOND
+        private void timeProcessor()
+        {
+            //CREATES A NEW TIMER CALLED MYTIMER
+            Timer myTimer = new Timer();
+
+            //SETS INTERVAL TO 1 SECOND
+            myTimer.Interval = 1000;
+
+            //ANNONYMOUS METHOD FOR TICK EVENT
+            myTimer.Tick += delegate(object sender, EventArgs e)
+            {
+                timerLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+            };
+
+            //STARTS THE TIMER
+            myTimer.Start();
+        }
+
+/******************************************************************************************************************/
+
+        //METHOD TO DRAW THE TITLE STRING ACROSS THE TOP OF THE FORM
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            //CALLS ONPAINT METHODS BASE CLASS
+            base.OnPaint(e);
+
+            //SETS FONT OBJECT
+            Font myFont = new Font("DefaultFont", 24, FontStyle.Italic);
+
+            //GETS SIZE OF STRING
+            SizeF sf = e.Graphics.MeasureString("Shipping Dispatcher", myFont);
+            int width = (int) sf.Width;
+
+            //SETS X & Y COORDS TO DRAW TITLE
+            int y = ClientRectangle.Top + 15;
+            int x = (ClientRectangle.Width - width) / 2;
+
+            //DRAWS SHIPPING DISPATCHER STRING ACROSS TOP OF FORM
+            e.Graphics.DrawString("Shipping Dispatcher", myFont, new SolidBrush(Color.Blue), x, y);
+
+            //DRAWS BOARDER AROUND CLIENT
+            Rectangle myBorder = this.ClientRectangle;
+            ControlPaint.DrawBorder(e.Graphics, myBorder, Color.DarkBlue, 10, ButtonBorderStyle.Solid, Color.DarkBlue, 10, ButtonBorderStyle.Solid, Color.LightSkyBlue, 10, ButtonBorderStyle.Solid, Color.LightSkyBlue, 10, ButtonBorderStyle.Solid);
+        }
+
+/******************************************************************************************************************/
+
+        //CALL DRIVER BUTTON METHOD
+        //METHOD COMMUNICATES WITH THE COMMLIBRARY TO RETURN THE MESSAGE
+        private void callDriverbtnClick(object sender, EventArgs e)
+        {
+            //comm.fillOrders();
+
+            //CREATES A STRING FOR DRIVER TEXT BOX INPUT
+            string s = DriverBox.Text;
+
+            //CHECKS FOR VALID STRING AND OPENS MESSAGE BOX
+            if (!String.IsNullOrEmpty(s))
+            {
+                try
+                {
+                    //TRYING RECEIVE MESSAGE METHOD
+                    string result = comm.ReceiveMessage(this, s);
+                    MessageBox.Show(result);
+                }
+
+                catch(CommunicationException  ce)
+                {
+                    try
+                    {
+                        //IF INNER EXCEPTION EXISTS DISPLAY EXCEPTION
+                        MessageBox.Show(ce.Addressee, ce.InnerException.Message);
+                    }
+
+                    catch
+                    {
+                        //ELSE DISPLAY COMMUNICATION EXCEPTIONS MESSAGE
+                        MessageBox.Show(ce.Message, "Error Message Box");
+                    }
+                }          
+            }
+        }
+
+/******************************************************************************************************************/
+
+        //TURON ORDERS ON BUTTON CLICK HANDLER
+        private void OrdersBtn_Click(object sender, EventArgs e)
+        {
+            if (OrdersBtn.Text == "Turn Orders On")
+            {
+                OrdersBtn.Text = "Turn Orders Off";
+                comm.OrderEvent += new Communicator.OrderEventHandler(comm_OrderEvent);
+            }
+
+            else
+            {
+                OrdersBtn.Text = "Turn Orders On";
+                comm.OrderEvent -= new Communicator.OrderEventHandler(comm_OrderEvent);
+            }
+        }
+
+/******************************************************************************************************************/
+
+        //METHOD THAT RECEIVED RANDOM ORDER EVENT ARGS AND POPULATES FIELDS
+        void comm_OrderEvent(object sender, OrderEventArgs oea)
+        {         
+            //POPULATE SHIP COMBO BOX
+            ShipCombo.SelectedIndex = oea.IndexNum;
+  
+            //POPULATE STREET ADDRESS COMBO BOX
+            StreetBox.Text = oea.Address;           
+
+            //POPULATE CITY TEXT BOX
+            CityBox.Text = oea.City;                
+
+            //POPULATE STATE COMBO BOX
+            int stateIndex = StateCombo.FindString(oea.State);
+            StateCombo.SelectedIndex = stateIndex;
+
+            //POPULATE DRIVER COMBO BOX
+            DriverBox.Text = oea.Driver; 
+
+            //CHANGE BUTTON COLOR TO RED WHEN ORDER IS RECEIVED
+            OrdersBtn.BackColor = Color.Red;
+
+            //SLEEP FOR ONE SECOND
+            System.Threading.Thread.Sleep(1000);
+
+            //CHANGE BUTTON COLOR BACK TO DEFAULT AFTER SLEEP
+            OrdersBtn.BackColor = default(Color);
+        }
+
+/******************************************************************************************************************/
+
+        //METHOD TO CLOSE THE SHIPPING DISPATCHER WHEN CLOSE BUTTON IS CLICKED
+        private void btnClose_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+    }
+}
